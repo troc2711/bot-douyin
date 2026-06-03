@@ -1,8 +1,27 @@
 import logging
 import re
 import requests
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+
+# ── 0. MÁY CHỦ WEB ẢO ĐỂ LÁCH LUẬT RENDER ──────────────────────────────────
+class DummyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b"May chu Bot dang hoat dong binh thuong!")
+
+def keep_alive():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), DummyHandler)
+    server.serve_forever()
+
+# Kích hoạt web ảo chạy ngầm song song với Bot
+threading.Thread(target=keep_alive, daemon=True).start()
 
 # ── 1. CONFIG TOKEN ────────────────────────────────────────────────────────
 TOKEN = "8094659505:AAGg1bHEObkQWnJ5-BfL-55jTIeu4ZtWRqE"
@@ -34,7 +53,6 @@ def extract_video_url(text):
 # ── 4. TẬN DỤNG HỆ THỐNG ZSANGTAO.COM ───────────────────────────────────────
 def get_video_from_zsangtao(douyin_url):
     try:
-        # Gửi yêu cầu giải mã link sang cổng API ngầm của zsangtao.com
         api_url = "https://backend.zsangtao.com/api/v1/douyin/download"
         payload = {"url": douyin_url}
         headers = {
@@ -44,10 +62,8 @@ def get_video_from_zsangtao(douyin_url):
         response = requests.post(api_url, json=payload, headers=headers, timeout=15)
         res_json = response.json()
         
-        # Bóc tách link video không logo từ kết quả web trả về
         if res_json.get("status") == "success" or "data" in res_json:
             data = res_json.get("data", {})
-            # Thử lấy link video chất lượng cao nhất không logo
             video_url = data.get("video_nowatermark") or data.get("video")
             title = data.get("title", "Video Douyin")
             return video_url, title
@@ -63,7 +79,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Vào app Douyin ➔ Bấm Chia sẻ ➔ Chọn Sao chép liên kết ➔ Dán thẳng vào đây.")
         return
     elif user_text == 'ℹ️ Trạng thái Bot':
-        await update.message.reply_text("🟢 Bot kết nối ZSangTao ổn định 24/7!")
+        await update.message.reply_text("🟢 Bot kết nối ZSangTao ổn định 24/7 trên Render!")
         return
 
     clean_url = extract_video_url(user_text)
@@ -73,7 +89,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     status_msg = await update.message.reply_text("🔄 Đang gửi link sang zsangtao.com để xử lý, đợi tí nhé...")
 
-    # Gọi hàm mượn web zsangtao tải hộ
     video_url, video_title = get_video_from_zsangtao(clean_url)
 
     if not video_url:
