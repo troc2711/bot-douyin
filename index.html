@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tool Tải Douyin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <h2>Tool tải video cá nhân</h2>
+    <input type="text" id="url" placeholder="Dán link vào đây..." style="width: 80%; padding: 10px;">
+    <button onclick="download()">Tải ngay</button>
+    <div id="result"></div>
+
+    <script>
+        async function download() {
+            let url = document.getElementById('url').value;
+            document.getElementById('result').innerHTML = "Đang xử lý...";
+            // Gọi thẳng API của Zsangtao hoặc TikWM từ trình duyệt của bạn
+            let res = await fetch('https://api.tikwm.com/api/', {
+                method: 'POST',
+                body: JSON.stringify({url: url})
+            });
+            let data = await res.json();
+            if(data.code == 0) {
+                window.location.href = data.data.play; // Tải video về máy
+            } else {
+                document.getElementById('result').innerHTML = "Lỗi rồi!";
+            }
+        }
+    </script>
+</body>
+</html>
