@@ -3,11 +3,12 @@ import re
 import requests
 import os
 import threading
+import asyncio
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# ── 0. MÁY CHỦ WEB ẢO ĐỂ LÁCH LUẬT RENDER ──────────────────────────────────
+# ── 0. MÁY CHỦ WEB ẢO ĐỂ LÁCH LUẬT RENDER FREE ─────────────────────────────
 class DummyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,12 +24,12 @@ def keep_alive():
 # Kích hoạt web ảo chạy ngầm song song với Bot
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# ── 1. CONFIG TOKEN ────────────────────────────────────────────────────────
+# ── 1. CẤU HÌNH TOKEN BOT ──────────────────────────────────────────────────
 TOKEN = "8094659505:AAGg1bHEObkQWnJ5-BfL-55jTIeu4ZtWRqE"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# ── 2. MENU BÀN PHÍM ───────────────────────────────────────────────────────
+# ── 2. CẤU HÌNH BÀN PHÍM MENU ──────────────────────────────────────────────
 def get_video_keyboard():
     keyboard = [['🎬 Hướng dẫn lấy link', 'ℹ️ Trạng thái Bot']]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, input_field_placeholder="Dán văn bản chia sẻ Douyin vào đây...")
@@ -106,10 +107,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await status_msg.edit_text(f"❌ Lỗi gửi video từ Telegram: {str(e)}")
 
+# ── 6. KHỞI CHẠY CHÍNH ─────────────────────────────────────────────────────
 def main():
+    # SỬA LỖI EVENT LOOP TRÊN PYTHON PHIÊN BẢN MỚI CỦA RENDER
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
     print("Bot ZSangTao đang chạy...")
     app.run_polling()
 
