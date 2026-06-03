@@ -21,7 +21,6 @@ def keep_alive():
     server = HTTPServer(('0.0.0.0', port), DummyHandler)
     server.serve_forever()
 
-# Kích hoạt web ảo chạy ngầm song song với Bot
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # ── 1. CẤU HÌNH TOKEN BOT ──────────────────────────────────────────────────
@@ -29,87 +28,86 @@ TOKEN = "8094659505:AAGg1bHEObkQWnJ5-BfL-55jTIeu4ZtWRqE"
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# ── 2. CẤU HÌNH BÀN PHÍM MENU ──────────────────────────────────────────────
 def get_video_keyboard():
     keyboard = [['🎬 Hướng dẫn lấy link', 'ℹ️ Trạng thái Bot']]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, input_field_placeholder="Dán văn bản chia sẻ Douyin vào đây...")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "✨ **Bot Tải Video Douyin Tự Động Qua ZSangTao!**\n\n"
-        "📥 Bạn cứ dán nguyên đoạn text chia sẻ có chứa link Douyin vào đây, mình sẽ tự gửi sang web zsangtao.com để lấy video không logo về cho bạn!",
+        "✨ **Bot Tải Video Douyin/TikTok Siêu Tốc!**\n\n"
+        "📥 Dán nguyên đoạn văn bản chia sẻ vào đây, mình sẽ lấy video không logo về ngay lập tức!",
         parse_mode="Markdown",
         reply_markup=get_video_keyboard()
     )
 
-# ── 3. BỘ LỌC TỰ ĐỘNG TÌM LINK ──────────────────────────────────────────────
+# ── 2. XỬ LÝ LẤY LINK VÀ TẢI VIDEO TỪ TIKWM (CHUẨN QUỐC TẾ) ───────────────
 def extract_video_url(text):
-    match = re.search(r'(https?://[^\s]+)', text)
+    # Lọc siêu cẩn thận, chỉ lấy chữ, số và ký tự của link, bỏ lại toàn bộ tiếng Trung
+    match = re.search(r'(https?://[a-zA-Z0-9./\-_?=]+)', text)
     if match:
         url = match.group(1)
         if url.endswith('/'): url = url[:-1]
         return url
     return None
 
-# ── 4. TẬN DỤNG HỆ THỐNG ZSANGTAO.COM ───────────────────────────────────────
-def get_video_from_zsangtao(douyin_url):
+def resolve_url(url):
     try:
-        api_url = "https://backend.zsangtao.com/api/v1/douyin/download"
-        payload = {"url": douyin_url}
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-        }
-        response = requests.post(api_url, json=payload, headers=headers, timeout=15)
-        res_json = response.json()
-        
-        if res_json.get("status") == "success" or "data" in res_json:
-            data = res_json.get("data", {})
-            video_url = data.get("video_nowatermark") or data.get("video")
-            title = data.get("title", "Video Douyin")
-            return video_url, title
-    except Exception as e:
-        print(f"Lỗi kết nối zsangtao: {e}")
-    return None, None
+        response = requests.head(url, allow_redirects=True, timeout=10)
+        return response.url
+    except Exception:
+        return url
 
-# ── 5. XỬ LÝ TIN NHẮN ──────────────────────────────────────────────────────
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_text = update.message.text
 
     if user_text == '🎬 Hướng dẫn lấy link':
-        await update.message.reply_text("Vào app Douyin ➔ Bấm Chia sẻ ➔ Chọn Sao chép liên kết ➔ Dán thẳng vào đây.")
+        await update.message.reply_text("Vào app ➔ Bấm Chia sẻ ➔ Chọn Sao chép liên kết ➔ Dán thẳng vào đây.")
         return
     elif user_text == 'ℹ️ Trạng thái Bot':
-        await update.message.reply_text("🟢 Bot kết nối ZSangTao ổn định 24/7 trên Render!")
+        await update.message.reply_text("🟢 Bot đang chạy trên Render xịn. Tốc độ bàn thờ!")
         return
 
     clean_url = extract_video_url(user_text)
-    if not clean_url or "douyin.com" not in clean_url:
-        await update.message.reply_text("⚠️ Không tìm thấy link Douyin hợp lệ. Vui lòng thử lại.")
+    if not clean_url:
+        await update.message.reply_text("⚠️ Không tìm thấy link hợp lệ. Vui lòng thử lại.")
         return
 
-    status_msg = await update.message.reply_text("🔄 Đang gửi link sang zsangtao.com để xử lý, đợi tí nhé...")
-
-    video_url, video_title = get_video_from_zsangtao(clean_url)
-
-    if not video_url:
-        await status_msg.edit_text("❌ Hệ thống zsangtao không phân tích được link này hoặc đang bảo trì rồi bạn ơi.")
-        return
+    status_msg = await update.message.reply_text("🔄 Đang nạp dữ liệu video...")
 
     try:
-        await status_msg.edit_text("🚀 Đang tải video về Telegram của bạn...")
+        # Giải mã link rút gọn
+        real_url = resolve_url(clean_url)
+        
+        # Gọi API TikWM
+        api_url = "https://tikwm.com/api/"
+        response = requests.get(api_url, params={"url": real_url, "hd": "1"}, timeout=15)
+        res_json = response.json()
+
+        if res_json.get("code") != 0:
+            await status_msg.edit_text(f"❌ Web nguồn từ chối phân tích: {res_json.get('msg', 'Lỗi không xác định')}")
+            return
+
+        data = res_json.get("data", {})
+        video_url = data.get("hdplay") or data.get("play")
+        video_title = data.get("title", "Video Downloader")
+
+        if not video_url:
+            await status_msg.edit_text("❌ Không tìm thấy file video.")
+            return
+
+        await status_msg.edit_text("🚀 Đang bắn video qua Telegram cho bạn...")
         await update.message.reply_video(
             video=video_url,
-            caption=f"🎬 **Tiêu đề:** {video_title}\n\n📥 *Tận dụng thành công từ ZSangTao!*",
+            caption=f"🎬 **{video_title}**",
             parse_mode="Markdown"
         )
         await status_msg.delete()
-    except Exception as e:
-        await status_msg.edit_text(f"❌ Lỗi gửi video từ Telegram: {str(e)}")
 
-# ── 6. KHỞI CHẠY CHÍNH ─────────────────────────────────────────────────────
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Lỗi đường truyền: {str(e)}")
+
+# ── 3. KHỞI CHẠY BOT ───────────────────────────────────────────────────────
 def main():
-    # SỬA LỖI EVENT LOOP TRÊN PYTHON PHIÊN BẢN MỚI CỦA RENDER
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -120,7 +118,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("Bot ZSangTao đang chạy...")
+    print("Bot đang chạy ổn định...")
     app.run_polling()
 
 if __name__ == '__main__':
