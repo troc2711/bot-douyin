@@ -4,26 +4,36 @@
     <title>Tool Tải Douyin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
-    <h2>Tool tải video cá nhân</h2>
-    <input type="text" id="url" placeholder="Dán link vào đây..." style="width: 80%; padding: 10px;">
-    <button onclick="download()">Tải ngay</button>
-    <div id="result"></div>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h3>Tool tải video cá nhân</h3>
+    <input type="text" id="url" placeholder="Dán link vào đây..." style="width: 100%; padding: 10px; box-sizing: border-box;">
+    <button onclick="download()" style="margin-top: 10px; padding: 10px 20px;">Tải ngay</button>
+    <div id="result" style="margin-top: 15px;"></div>
 
     <script>
         async function download() {
-            let url = document.getElementById('url').value;
-            document.getElementById('result').innerHTML = "Đang xử lý...";
-            // Gọi thẳng API của Zsangtao hoặc TikWM từ trình duyệt của bạn
-            let res = await fetch('https://api.tikwm.com/api/', {
-                method: 'POST',
-                body: JSON.stringify({url: url})
-            });
-            let data = await res.json();
-            if(data.code == 0) {
-                window.location.href = data.data.play; // Tải video về máy
-            } else {
-                document.getElementById('result').innerHTML = "Lỗi rồi!";
+            let fullText = document.getElementById('url').value;
+            // Tự động lọc lấy link douyin
+            let match = fullText.match(/https?:\/\/[^\s]+/);
+            if(!match) { document.getElementById('result').innerHTML = "Link không hợp lệ!"; return; }
+            let url = match[0];
+            
+            document.getElementById('result').innerHTML = "Đang kết nối...";
+            
+            try {
+                // Dùng CORS Proxy để vượt tường lửa
+                let proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent('https://tikwm.com/api/?url=' + url + '&hd=1');
+                let res = await fetch(proxyUrl);
+                let data = await res.json();
+                
+                if(data.code == 0) {
+                    document.getElementById('result').innerHTML = "Đang tải...";
+                    window.location.href = data.data.play; 
+                } else {
+                    document.getElementById('result').innerHTML = "Lỗi API: " + data.msg;
+                }
+            } catch(e) {
+                document.getElementById('result').innerHTML = "Lỗi kết nối: " + e.message;
             }
         }
     </script>
