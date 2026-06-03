@@ -42,7 +42,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── 2. XỬ LÝ LẤY LINK VÀ TẢI VIDEO TỪ TIKWM (CHUẨN QUỐC TẾ) ───────────────
 def extract_video_url(text):
-    # Lọc siêu cẩn thận, chỉ lấy chữ, số và ký tự của link, bỏ lại toàn bộ tiếng Trung
     match = re.search(r'(https?://[a-zA-Z0-9./\-_?=]+)', text)
     if match:
         url = match.group(1)
@@ -52,7 +51,12 @@ def extract_video_url(text):
 
 def resolve_url(url):
     try:
-        response = requests.head(url, allow_redirects=True, timeout=10)
+        # BÍ KÍP Ở ĐÂY: Đeo mặt nạ iPhone để Douyin không chặn đường
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1"
+        })
+        response = session.head(url, allow_redirects=True, timeout=15)
         return response.url
     except Exception:
         return url
@@ -64,7 +68,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Vào app ➔ Bấm Chia sẻ ➔ Chọn Sao chép liên kết ➔ Dán thẳng vào đây.")
         return
     elif user_text == 'ℹ️ Trạng thái Bot':
-        await update.message.reply_text("🟢 Bot đang chạy trên Render xịn. Tốc độ bàn thờ!")
+        await update.message.reply_text("🟢 Bot đang chạy trên Render. Tốc độ cao, không bị chặn!")
         return
 
     clean_url = extract_video_url(user_text)
@@ -75,10 +79,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("🔄 Đang nạp dữ liệu video...")
 
     try:
-        # Giải mã link rút gọn
         real_url = resolve_url(clean_url)
         
-        # Gọi API TikWM
         api_url = "https://tikwm.com/api/"
         response = requests.get(api_url, params={"url": real_url, "hd": "1"}, timeout=15)
         res_json = response.json()
